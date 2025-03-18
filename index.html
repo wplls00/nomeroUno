@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digit Recognizer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f9;
+    }
+    canvas {
+      border: 2px solid black;
+      margin-top: 20px;
+      background-color: white;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 18px;
+      color: green;
+    }
+  </style>
+</head>
+<body>
+  <h1>Нарисуйте цифру (0-9)</h1>
+  <canvas id="drawCanvas" width="280" height="280"></canvas>
+  <div>
+    <button onclick="clearCanvas()">Очистить</button>
+    <button onclick="predictDigit()">Распознать</button>
+  </div>
+  <div id="result">Результат: ?</div>
+  <div id="status">Загрузка модели...</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script>
+    const canvas = document.getElementById('drawCanvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+
+    // Set up drawing functionality
+    canvas.addEventListener('mousedown', (e) => {
+      isDrawing = true;
+      draw(e);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (isDrawing) draw(e);
+    });
+
+    canvas.addEventListener('mouseup', () => isDrawing = false);
+    canvas.addEventListener('mouseout', () => isDrawing = false);
+
+    function draw(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      ctx.lineWidth = 20;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'black';
+
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
+      document.getElementById('result').innerText = 'Результат: ?';
+    }
+
+    async function loadModel() {
+      return await tf.loadLayersModel('./mnist_model/model.json');
+    }
+
+    async function predictDigit() {
+      if (!window.model) {
+        alert('Модель ещё загружается, подождите...');
+        return;
+      }
+
+      // Convert canvas image to tensor
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const tensor = preprocessImage(imgData);
+
+      // Predict digit
+      const prediction = await window.model.predict(tensor).data();
+      const result = Array.from(prediction).indexOf(Math.max(...prediction));
+      document.getElementById('result').innerText = `Результат: ${result}`;
+    }
+
+    function preprocessImage(imageData) {
+      const { data, width, height } = imageData;
+      const grayscale = [];
+      
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        grayscale.push(255 - avg); // Invert colors
+      }
+
+      const resized = tf.tidy(() => {
+        return tf.tensor(grayscale, [height, width])
+          .resizeBilinear([28, 28])
+          .div(255.0)
+          .reshape([1, 28, 28, 1]);
+      });
+
+      return resized;
+    }
+
+    // Load the model on page load
+    window.onload = async () => {
+      window.model = await loadModel();
+      document.getElementById('status').innerText = 'Модель готова к использованию!';
+    };
+  </script>
+</body>
+</html>
