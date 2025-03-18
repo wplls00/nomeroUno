@@ -105,24 +105,26 @@
       document.getElementById('result').innerText = `Результат: ${result}`;
     }
 
-    function preprocessImage(imageData) {
-      const { data, width, height } = imageData;
-      const grayscale = [];
-      
-      for (let i = 0; i < data.length; i += 4) {
-        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        grayscale.push(255 - avg); // Invert colors
-      }
+   function preprocessImage(imageData) {
+  const { data, width, height } = imageData;
+  const grayscale = [];
+  
+  // Преобразуем RGB в оттенки серого
+  for (let i = 0; i < data.length; i += 4) {
+    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    grayscale.push(255 - avg); // Инвертируем цвета
+  }
 
-      const resized = tf.tidy(() => {
-        return tf.tensor(grayscale, [height, width])
-          .resizeBilinear([28, 28])
-          .div(255.0)
-          .reshape([1, 28, 28, 1]);
-      });
+  // Преобразуем массив в тензор и изменяем размер до 28x28
+  const resized = tf.tidy(() => {
+    return tf.tensor(grayscale, [height, width]) // Создаём тензор из массива
+      .resizeBilinear([28, 28]) // Масштабируем до 28x28
+      .div(255.0) // Нормализуем значения к диапазону [0, 1]
+      .reshape([1, 28, 28, 1]); // Добавляем размерность батча и канала
+  });
 
-      return resized;
-    }
+  return resized;
+}
 
     // Load the model on page load
     window.onload = async () => {
